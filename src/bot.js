@@ -1,5 +1,5 @@
 // Persistent process. Use this INSTEAD OF the GitHub Actions workflow if you want the
-// interactive /getfact command — GitHub Actions can't stay running to listen for messages,
+// interactive /fact command — GitHub Actions can't stay running to listen for messages,
 // so command support requires an always-on host (VPS, Railway, Render background worker,
 // Fly.io, etc). Run with `npm run bot`, ideally under pm2 or a systemd service so it restarts
 // if it crashes.
@@ -15,7 +15,7 @@ import { pickAndSendFact } from "./factService.js";
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const GROUP_CHAT_IDS = String(process.env.TELEGRAM_CHAT_ID).split(",").map(id => id.trim()).filter(Boolean);
 const TIMEZONE = "Asia/Singapore";
-const COOLDOWN_MS = 10_000; // guard against /getfact spam burning your Gemini quota
+const COOLDOWN_MS = 10_000; // guard against /fact spam burning your Gemini quota
 
 if (!TOKEN || !process.env.TELEGRAM_CHAT_ID || !process.env.GEMINI_API_KEY) {
   console.error("Missing required env vars. Copy .env.example to .env and fill it in.");
@@ -96,7 +96,7 @@ async function handleGetFact(chatId, allowedTopicIds = null) {
   try {
     await pickAndSendFact(chatId, allowedTopicIds);
   } catch (err) {
-    console.error("Error handling /getfact:", err);
+    console.error("Error handling command:", err);
     await fetch(`${API}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -133,12 +133,12 @@ async function pollLoop() {
       // Any chat can trigger this now (group or DM) — see COOLDOWN_MS above for the
       // per-chat spam/quota guard. Logged here so you have an audit trail of who's using it.
       const commandMap = {
-        "/getfact": null,
-        "/getquote": ["quotes-famous", "quotes-world-leaders"],
-        "/getfirsts": ["firsts"],
-        "/getmusic": ["music-decade", "musicals"],
-        "/getpicture": ["picture-round-brands", "picture-round-celebrities"],
-        "/getknowledge": ["singapore", "general-knowledge"]
+        "/fact": null,
+        "/quote": ["quotes-famous", "quotes-world-leaders"],
+        "/firsts": ["firsts"],
+        "/music": ["music-decade", "musicals"],
+        "/picture": ["picture-round-brands", "picture-round-celebrities"],
+        "/knowledge": ["singapore", "general-knowledge"]
       };
 
       const textLower = text.toLowerCase();
