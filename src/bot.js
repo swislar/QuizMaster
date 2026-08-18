@@ -15,7 +15,7 @@ import { pickAndSendFact } from "./factService.js";
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const GROUP_CHAT_IDS = String(process.env.TELEGRAM_CHAT_ID).split(",").map(id => id.trim()).filter(Boolean);
 const TIMEZONE = "Asia/Singapore";
-const COOLDOWN_MS = 60_000; // guard against /getfact spam burning your Gemini quota
+const COOLDOWN_MS = 10_000; // guard against /getfact spam burning your Gemini quota
 
 if (!TOKEN || !process.env.TELEGRAM_CHAT_ID || !process.env.GEMINI_API_KEY) {
   console.error("Missing required env vars. Copy .env.example to .env and fill it in.");
@@ -86,7 +86,7 @@ async function handleGetFact(chatId, allowedTopicIds = null) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ chat_id: chatId, action: "typing" }),
-    }).catch(() => {});
+    }).catch(() => { });
 
   await showTyping();
   // Telegram's "typing..." indicator only lasts ~5s; a rate-limit backoff can take much
@@ -154,7 +154,7 @@ async function pollLoop() {
         const from = update.message?.from;
         console.log(
           `${matchedCommand} triggered in chat ${chatId} (type: ${update.message.chat.type}) ` +
-            `by ${from?.username || from?.first_name || "unknown"}`
+          `by ${from?.username || from?.first_name || "unknown"}`
         );
         handleGetFact(chatId, commandMap[matchedCommand]); // fire and forget, don't block the poll loop
       }
