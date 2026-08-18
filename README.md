@@ -1,4 +1,4 @@
-# Quiz Prep Fact Bot (Telegram)
+# QuizMaster
 
 Sends a daily trivia fact to your study group's Telegram chat at **09:00 Asia/Singapore**,
 modeled on Quizmaster SG round categories (quotes, "firsts", music decades, picture rounds,
