@@ -57,6 +57,8 @@ Requirements:
     topic.listenPreferred
       ? "\n- When you search to ground this, specifically look for the song's official YouTube " +
         "upload or Spotify listing so a listenable link is available among your sources."
+      : topic.imageSourcePreferred
+      ? "\n- When you search to ground this, specifically look for a source that contains a clear image of the subject, since this is for a picture round."
       : ""
   }
 
@@ -113,8 +115,12 @@ SUMMARY: <a 5-8 word unique summary of this specific fact, for dedup purposes>`;
   // press play on over e.g. a Wikipedia page — falls back to the first grounded source if
   // no listenable link was among the search results Gemini grounded on.
   const isListenable = (u) => /youtube\.com|youtu\.be|open\.spotify\.com/i.test(u);
+  const isImageHost = (u) => /instagram\.com|pinterest\.com|unsplash\.com|commons\.wikimedia\.org|flickr\.com/i.test(u) || /\.(jpe?g|png|webp|gif|svg)$/i.test(u);
+  
   const preferredUrl = topic.listenPreferred
     ? sourceUrls.find(isListenable) || sourceUrls[0]
+    : topic.imageSourcePreferred
+    ? sourceUrls.find(isImageHost) || sourceUrls[0]
     : sourceUrls[0];
 
   return {

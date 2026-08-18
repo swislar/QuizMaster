@@ -5,8 +5,8 @@ function escapeHTML(str) {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-export function formatMessage({ categoryLabel, fact, sourceUrl, listenPreferred }) {
-  const linkLabel = listenPreferred ? "🎧 Listen" : "🔗 Source";
+export function formatMessage({ categoryLabel, fact, sourceUrl, listenPreferred, imageSourcePreferred }) {
+  const linkLabel = listenPreferred ? "🎧 Listen" : imageSourcePreferred ? "🖼️ View Image" : "🔗 Source";
   return (
     `📚 CATEGORY: ${escapeHTML(categoryLabel)}\n\n` +
     `${escapeHTML(fact)}\n\n` +
