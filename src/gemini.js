@@ -48,6 +48,7 @@ What this round tests: ${topic.guidance}
 
 ${avoidBlock}
 Requirements:
+- Focus on LESS COMMONLY KNOWN facts and MORE OBSCURE subjects (e.g., avoid the most obvious mega-brands like Nike or celebrities like Taylor Swift). Dig deeper for interesting trivia that people might not immediately know.
 - The fact MUST be something you can verify using the Google Search tool available to you.
   Do not state anything you cannot ground in an actual search result.
 - Write 1-3 sentences. Specific, memorable, and quiz-relevant (names, dates, numbers where
