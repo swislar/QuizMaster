@@ -80,9 +80,14 @@ export const TOPICS = [
   },
 ];
 
-export function pickTopic(recentTopicIds) {
+export function pickTopic(recentTopicIds, allowedTopicIds = null) {
   const recentSet = new Set(recentTopicIds);
-  const fresh = TOPICS.filter((t) => !recentSet.has(t.id));
-  const pool = fresh.length > 0 ? fresh : TOPICS; // if we've cycled through all, reset
+  let available = TOPICS;
+  if (allowedTopicIds) {
+    const allowedSet = new Set(allowedTopicIds);
+    available = available.filter(t => allowedSet.has(t.id));
+  }
+  const fresh = available.filter((t) => !recentSet.has(t.id));
+  const pool = fresh.length > 0 ? fresh : available; // if we've cycled through all, reset
   return pool[Math.floor(Math.random() * pool.length)];
 }

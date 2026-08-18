@@ -14,7 +14,7 @@ function sleep(ms) {
  * in history. Throws if it can't produce a grounded fact after MAX_ATTEMPTS — callers
  * decide how to surface that (exit code for the daily script, a chat reply for /getfact).
  */
-export async function pickAndSendFact(chatIds) {
+export async function pickAndSendFact(chatIds, allowedTopicIds = null) {
   const ids = Array.isArray(chatIds) ? chatIds : [chatIds];
   const history = await loadHistory();
   const avoidTopicIds = recentTopicIds(history, 4);
@@ -25,7 +25,7 @@ export async function pickAndSendFact(chatIds) {
   let usedTopic = null;
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    const topic = pickTopic([...avoidTopicIds, ...attempted]);
+    const topic = pickTopic([...avoidTopicIds, ...attempted], allowedTopicIds);
     attempted.add(topic.id);
     console.log(`Attempt ${attempt + 1}: trying topic "${topic.label}"...`);
 

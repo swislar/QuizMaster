@@ -29,7 +29,12 @@ let offset = 0; // Telegram update_id cursor for long polling
 async function setBotCommands() {
   const url = `${API}/setMyCommands`;
   const commands = [
-    { command: "getfact", description: "Get a random trivia fact right now" }
+    { command: "getfact", description: "Get a random trivia fact right now" },
+    { command: "getquote", description: "Get a quote from a famous person or world leader" },
+    { command: "getfirsts", description: "Get a notable 'first' in history" },
+    { command: "getmusic", description: "Get a music or musical theatre fact" },
+    { command: "getpicture", description: "Get a fact about a brand or celebrity" },
+    { command: "getknowledge", description: "Get general knowledge or Singapore facts" }
   ];
   try {
     const res = await fetch(url, {
@@ -59,7 +64,7 @@ async function getUpdates() {
   return data.result;
 }
 
-async function handleGetFact(chatId) {
+async function handleGetFact(chatId, allowedTopicIds = null) {
   const now = Date.now();
   const msSinceLast = now - (lastManualTrigger.get(chatId) || 0);
   if (msSinceLast < COOLDOWN_MS) {
@@ -89,7 +94,7 @@ async function handleGetFact(chatId) {
   const typingInterval = setInterval(showTyping, 4000);
 
   try {
-    await pickAndSendFact(chatId);
+    await pickAndSendFact(chatId, allowedTopicIds);
   } catch (err) {
     console.error("Error handling /getfact:", err);
     await fetch(`${API}/sendMessage`, {
@@ -127,13 +132,31 @@ async function pollLoop() {
 
       // Any chat can trigger this now (group or DM) — see COOLDOWN_MS above for the
       // per-chat spam/quota guard. Logged here so you have an audit trail of who's using it.
-      if (text === "/getfact" || text.startsWith("/getfact@")) {
+      const commandMap = {
+        "/getfact": null,
+        "/getquote": ["quotes-famous", "quotes-world-leaders"],
+        "/getfirsts": ["firsts"],
+        "/getmusic": ["music-decade", "musicals"],
+        "/getpicture": ["picture-round-brands", "picture-round-celebrities"],
+        "/getknowledge": ["singapore", "general-knowledge"]
+      };
+
+      const textLower = text.toLowerCase();
+      let matchedCommand = null;
+      for (const cmd in commandMap) {
+        if (textLower === cmd || textLower.startsWith(cmd + "@")) {
+          matchedCommand = cmd;
+          break;
+        }
+      }
+
+      if (matchedCommand) {
         const from = update.message?.from;
         console.log(
-          `/getfact triggered in chat ${chatId} (type: ${update.message.chat.type}) ` +
+          `${matchedCommand} triggered in chat ${chatId} (type: ${update.message.chat.type}) ` +
             `by ${from?.username || from?.first_name || "unknown"}`
         );
-        handleGetFact(chatId); // fire and forget, don't block the poll loop
+        handleGetFact(chatId, commandMap[matchedCommand]); // fire and forget, don't block the poll loop
       }
     }
   }
