@@ -55,6 +55,7 @@ export const TOPICS = [
       "A distinctive fact about a well-known brand or logo's design or history that would help " +
       "someone recognize it in a picture round (e.g. what a logo represents, when it was " +
       "redesigned, founding story).",
+    imageSourcePreferred: true,
   },
   {
     id: "picture-round-celebrities",
@@ -63,6 +64,7 @@ export const TOPICS = [
       "A distinctive, well-known identifying fact about a globally recognizable celebrity " +
       "(e.g. Simon Cowell, Kim Kardashian) — career milestone, defining trait, or well-known " +
       "biographical fact that helps someone identify or recall them.",
+    imageSourcePreferred: true,
   },
   {
     id: "singapore",
