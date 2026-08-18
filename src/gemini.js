@@ -64,7 +64,11 @@ Requirements:
 
 Respond in EXACTLY this format, nothing else:
 FACT: <the 1-3 sentence fact>
-SUMMARY: <a 5-8 word unique summary of this specific fact, for dedup purposes>`;
+SUMMARY: <a 5-8 word unique summary of this specific fact, for dedup purposes>${
+  topic.imageSourcePreferred
+    ? "\nIMAGE: <a direct URL starting with http to a public .jpg or .png image of the subject's face/logo>"
+    : ""
+}`;
 
   let data;
   try {
@@ -92,10 +96,12 @@ SUMMARY: <a 5-8 word unique summary of this specific fact, for dedup purposes>`;
 
   const text = candidate.content?.parts?.map((p) => p.text || "").join("\n") || "";
   const factMatch = text.match(/FACT:\s*([\s\S]*?)\nSUMMARY:/i);
-  const summaryMatch = text.match(/SUMMARY:\s*([\s\S]*)/i);
+  const summaryMatch = text.match(/SUMMARY:\s*([^\n]+)/i);
+  const imageMatch = text.match(/IMAGE:\s*([^\n]+)/i);
 
   const fact = factMatch?.[1]?.trim();
   const summary = summaryMatch?.[1]?.trim();
+  const imageUrl = imageMatch?.[1]?.trim();
   if (!fact) return null;
 
   // Pull the real, grounded source URL(s) out of groundingMetadata.
@@ -127,6 +133,7 @@ SUMMARY: <a 5-8 word unique summary of this specific fact, for dedup purposes>`;
     fact,
     summary: summary || fact.slice(0, 60),
     sourceUrl: preferredUrl,
+    imageUrl: imageUrl || null,
     allSourceUrls: sourceUrls,
   };
 }

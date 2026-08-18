@@ -5,11 +5,13 @@ function escapeHTML(str) {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-export function formatMessage({ categoryLabel, fact, sourceUrl, listenPreferred, imageSourcePreferred }) {
+export function formatMessage({ categoryLabel, fact, sourceUrl, listenPreferred, imageSourcePreferred, imageUrl }) {
   const linkLabel = listenPreferred ? "🎧 Listen" : imageSourcePreferred ? "🖼️ View Image" : "🔗 Source";
+  const imageEmbed = imageUrl ? `<a href="${escapeHTML(imageUrl)}">&#8205;</a>` : "";
   return (
     `📚 CATEGORY: ${escapeHTML(categoryLabel)}\n\n` +
     `${escapeHTML(fact)}\n\n` +
+    imageEmbed +
     `<a href="${escapeHTML(sourceUrl)}">${escapeHTML(linkLabel)}</a>`
   );
 }

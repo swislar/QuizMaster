@@ -62,6 +62,7 @@ export async function pickAndSendFact(chatIds, allowedTopicIds = null) {
     sourceUrl: result.sourceUrl,
     listenPreferred: usedTopic.listenPreferred,
     imageSourcePreferred: usedTopic.imageSourcePreferred,
+    imageUrl: result.imageUrl,
   });
 
   for (const id of ids) {

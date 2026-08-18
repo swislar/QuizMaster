@@ -29,12 +29,12 @@ let offset = 0; // Telegram update_id cursor for long polling
 async function setBotCommands() {
   const url = `${API}/setMyCommands`;
   const commands = [
-    { command: "getfact", description: "Get a random trivia fact right now" },
-    { command: "getquote", description: "Get a quote from a famous person or world leader" },
-    { command: "getfirsts", description: "Get a notable 'first' in history" },
-    { command: "getmusic", description: "Get a music or musical theatre fact" },
-    { command: "getpicture", description: "Get a fact about a brand or celebrity" },
-    { command: "getknowledge", description: "Get general knowledge or Singapore facts" }
+    { command: "fact", description: "Get a random trivia fact right now" },
+    { command: "quote", description: "Get a quote from a famous person or world leader" },
+    { command: "firsts", description: "Get a notable 'first' in history" },
+    { command: "music", description: "Get a music or musical theatre fact" },
+    { command: "picture", description: "Get a fact about a brand or celebrity" },
+    { command: "knowledge", description: "Get general knowledge or Singapore facts" }
   ];
   try {
     const res = await fetch(url, {
