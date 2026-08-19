@@ -77,8 +77,9 @@ export const TOPICS = [
     id: "general-knowledge",
     label: "General Knowledge",
     guidance:
-      "A broadly useful pub-quiz general knowledge fact — geography, science, history, or pop " +
-      "culture — of the kind commonly asked in trivia nights.",
+      "A broadly useful pub-quiz general knowledge fact — geography, science, history, pop " +
+      "culture, or language/wordplay (e.g. longest words, unique spelling patterns) — of the " +
+      "kind commonly asked in trivia nights.",
   },
 ];
 
