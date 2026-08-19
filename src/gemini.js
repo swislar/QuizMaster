@@ -42,13 +42,12 @@ Category: "${topic.label}"
 What it tests: ${topic.guidance}
 
 Please provide a detailed summary of facts you find, including names, dates, and numbers.
-Make sure to use the Google Search tool.${
-    topic.listenPreferred
+Make sure to use the Google Search tool.${topic.listenPreferred
       ? "\nSpecifically look for the song's official YouTube upload or Spotify listing so a listenable link is available among your sources."
       : topic.imageSourcePreferred
-      ? "\nSpecifically look for a source that contains a clear image of the subject, since this is for a picture round."
-      : ""
-  }`;
+        ? "\nSpecifically look for a source that contains a clear image of the subject, since this is for a picture round."
+        : ""
+    }`;
 
   let searchData;
   try {
@@ -64,12 +63,12 @@ Make sure to use the Google Search tool.${
     if (e.status === 429 || (e.message && e.message.includes("429"))) {
       const err = new Error(`Gemini API error 429 (rate limited on search): ${e.message}`);
       err.status = 429;
-      err.retryAfterMs = 30_000; 
+      err.retryAfterMs = 30_000;
       throw err;
     }
     throw e;
   }
-  
+
   const searchCandidate = searchData.candidates?.[0];
   if (!searchCandidate) return null;
 
@@ -106,11 +105,10 @@ ${searchContext}
 
 Respond in EXACTLY this format, nothing else:
 FACT: <the 1-3 sentence fact>
-SUMMARY: <a 5-8 word unique summary of this specific fact, for dedup purposes>${
-  topic.imageSourcePreferred
-    ? "\nIMAGE: <a direct URL starting with http to a public .jpg or .png image of the subject's face/logo, if available in the search results>"
-    : ""
-}`;
+SUMMARY: <a 5-8 word unique summary of this specific fact, for dedup purposes>${topic.imageSourcePreferred
+      ? "\nIMAGE: <a direct URL starting with http to a public .jpg or .png image of the subject's face/logo, if available in the search results>"
+      : ""
+    }`;
 
   let data;
   try {
@@ -125,7 +123,7 @@ SUMMARY: <a 5-8 word unique summary of this specific fact, for dedup purposes>${
     if (e.status === 429 || (e.message && e.message.includes("429"))) {
       const err = new Error(`Gemini API error 429 (rate limited on generation): ${e.message}`);
       err.status = 429;
-      err.retryAfterMs = 30_000; 
+      err.retryAfterMs = 30_000;
       throw err;
     }
     throw e;
@@ -159,12 +157,8 @@ SUMMARY: <a 5-8 word unique summary of this specific fact, for dedup purposes>${
   // press play on over e.g. a Wikipedia page — falls back to the first grounded source if
   // no listenable link was among the search results Gemini grounded on.
   const isListenable = (u) => /youtube\.com|youtu\.be|open\.spotify\.com/i.test(u);
-  const isImageHost = (u) => /instagram\.com|pinterest\.com|unsplash\.com|commons\.wikimedia\.org|flickr\.com/i.test(u) || /\.(jpe?g|png|webp|gif|svg)$/i.test(u);
-  
   const preferredUrl = topic.listenPreferred
     ? sourceUrls.find(isListenable) || sourceUrls[0]
-    : topic.imageSourcePreferred
-    ? sourceUrls.find(isImageHost) || sourceUrls[0]
     : sourceUrls[0];
 
   return {
