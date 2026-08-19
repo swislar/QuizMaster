@@ -68,7 +68,7 @@ SUMMARY: <a 5-8 word unique summary of this specific fact, for dedup purposes>${
       model: mainModel,
       contents: prompt,
       config: {
-        temperature: 0.9,
+        temperature: 0.7,
       }
     });
   } catch (e) {
@@ -144,7 +144,7 @@ Return a brief verification of the fact based on the search results.`;
 
   // For "listen now" categories, prefer a link you can actually press play on
   const isListenable = (u) => /youtube\.com|youtu\.be|open\.spotify\.com/i.test(u);
-  
+
   const preferredUrl = topic.listenPreferred
     ? sourceUrls.find(isListenable) || sourceUrls[0]
     : sourceUrls[0];
