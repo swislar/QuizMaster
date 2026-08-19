@@ -9,7 +9,6 @@
 import "dotenv/config";
 process.env.TZ = "Asia/Singapore";
 import fetch from "node-fetch";
-import cron from "node-cron";
 import { pickAndSendFact } from "./factService.js";
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -162,18 +161,5 @@ async function pollLoop() {
   }
 }
 
-function startDailySchedule() {
-  cron.schedule(
-    "0 9 * * *",
-    () => {
-      console.log(`[${new Date().toISOString()}] Running scheduled daily send...`);
-      pickAndSendFact(GROUP_CHAT_IDS).catch((err) => console.error("Daily send failed:", err));
-    },
-    { timezone: TIMEZONE }
-  );
-  console.log(`Daily schedule armed: 09:00 ${TIMEZONE}.`);
-}
-
-startDailySchedule();
 setBotCommands();
 pollLoop();

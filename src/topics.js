@@ -35,7 +35,7 @@ export const TOPICS = [
   },
   {
     id: "musicals",
-    label: "Musical Theatre: Name That Tune",
+    label: "Musical Theatre - Name That Tune",
     guidance:
       "Pick ONE well-known, widely popular song from a famous stage musical — prioritize songs " +
       "that even non-theatre-fans would likely recognize over obscure deep cuts. State the song title " +
@@ -47,7 +47,7 @@ export const TOPICS = [
   },
   {
     id: "picture-round-brands",
-    label: "Picture Round: Brands & Logos",
+    label: "Picture Round - Brands & Logos",
     guidance:
       "A distinctive fact about a well-known brand or logo's design or history that would help " +
       "someone recognize it in a picture round (e.g. what a logo represents, when it was " +
@@ -56,7 +56,7 @@ export const TOPICS = [
   },
   {
     id: "picture-round-celebrities",
-    label: "Picture Round: Celebrities",
+    label: "Picture Round - Celebrities",
     guidance:
       "A distinctive, well-known identifying fact about a globally recognizable celebrity " +
       "— career milestone, defining trait, or well-known biographical fact that helps someone identify or recall them.",

@@ -9,7 +9,7 @@ export function formatMessage({ categoryLabel, fact, sourceUrl, listenPreferred,
   const linkLabel = listenPreferred ? "🎧 Listen" : imageSourcePreferred ? "🖼️ View Image" : "🔗 Source";
   const imageEmbed = imageUrl ? `<a href="${escapeHTML(imageUrl)}">&#8205;</a>` : "";
   return (
-    `📚 CATEGORY: ${escapeHTML(categoryLabel)}\n\n` +
+    `📚 Category: ${escapeHTML(categoryLabel)}\n\n` +
     `${escapeHTML(fact)}\n\n` +
     imageEmbed +
     `<a href="${escapeHTML(sourceUrl)}">${escapeHTML(linkLabel)}</a>`
