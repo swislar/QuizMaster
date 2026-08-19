@@ -33,8 +33,53 @@ async function throttle() {
 export async function generateGroundedFact({ topic, avoidSummaries }) {
   await throttle();
 
-  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+  const searchModel = "gemini-2.5-flash";
+  const mainModel = process.env.GEMINI_MODEL || "gemini-3.7-flash";
 
+  // Step 1: Use gemini-2.5-flash for search and grounding
+  const searchPrompt = `Search for obscure and interesting trivia facts about the following category for a pub quiz.
+Category: "${topic.label}"
+What it tests: ${topic.guidance}
+
+Please provide a detailed summary of facts you find, including names, dates, and numbers.
+Make sure to use the Google Search tool.${
+    topic.listenPreferred
+      ? "\nSpecifically look for the song's official YouTube upload or Spotify listing so a listenable link is available among your sources."
+      : topic.imageSourcePreferred
+      ? "\nSpecifically look for a source that contains a clear image of the subject, since this is for a picture round."
+      : ""
+  }`;
+
+  let searchData;
+  try {
+    searchData = await ai.models.generateContent({
+      model: searchModel,
+      contents: searchPrompt,
+      config: {
+        tools: [{ googleSearch: {} }],
+        temperature: 0.7,
+      }
+    });
+  } catch (e) {
+    if (e.status === 429 || (e.message && e.message.includes("429"))) {
+      const err = new Error(`Gemini API error 429 (rate limited on search): ${e.message}`);
+      err.status = 429;
+      err.retryAfterMs = 30_000; 
+      throw err;
+    }
+    throw e;
+  }
+  
+  const searchCandidate = searchData.candidates?.[0];
+  if (!searchCandidate) return null;
+
+  const searchContext = searchCandidate.content?.parts?.map((p) => p.text || "").join("\n") || "";
+  const groundingMetadata = searchCandidate.groundingMetadata;
+
+  // We should throttle again since we are making a second call
+  await throttle();
+
+  // Step 2: Main model generates the fact
   const avoidBlock =
     avoidSummaries && avoidSummaries.length > 0
       ? `Avoid repeating these facts already sent recently:\n- ${avoidSummaries.join("\n- ")}\n`
@@ -49,44 +94,37 @@ What this round tests: ${topic.guidance}
 ${avoidBlock}
 Requirements:
 - Focus on LESS COMMONLY KNOWN facts and MORE OBSCURE subjects (e.g., avoid the most obvious mega-brands like Nike or celebrities like Taylor Swift). Dig deeper for interesting trivia that people might not immediately know.
-- The fact MUST be something you can verify using the Google Search tool available to you.
-  Do not state anything you cannot ground in an actual search result.
 - Write 1-3 sentences. Specific, memorable, and quiz-relevant (names, dates, numbers where
   relevant). Avoid vague trivia ("many people believe...").
 - Keep it concise enough to read in a Telegram message.
-- Do NOT include any URL in your answer text — sources are attached separately.${
-    topic.listenPreferred
-      ? "\n- When you search to ground this, specifically look for the song's official YouTube " +
-        "upload or Spotify listing so a listenable link is available among your sources."
-      : topic.imageSourcePreferred
-      ? "\n- When you search to ground this, specifically look for a source that contains a clear image of the subject, since this is for a picture round."
-      : ""
-  }
+- Do NOT include any URL in your answer text — sources are attached separately.
+
+Use the following search results to find a verified fact to use. ONLY use information supported by these search results:
+<search_results>
+${searchContext}
+</search_results>
 
 Respond in EXACTLY this format, nothing else:
 FACT: <the 1-3 sentence fact>
 SUMMARY: <a 5-8 word unique summary of this specific fact, for dedup purposes>${
   topic.imageSourcePreferred
-    ? "\nIMAGE: <a direct URL starting with http to a public .jpg or .png image of the subject's face/logo>"
+    ? "\nIMAGE: <a direct URL starting with http to a public .jpg or .png image of the subject's face/logo, if available in the search results>"
     : ""
 }`;
 
   let data;
   try {
     data = await ai.models.generateContent({
-      model: model,
+      model: mainModel,
       contents: prompt,
       config: {
-        tools: [{ googleSearch: {} }],
         temperature: 0.9,
       }
     });
   } catch (e) {
     if (e.status === 429 || (e.message && e.message.includes("429"))) {
-      const err = new Error(`Gemini API error 429 (rate limited): ${e.message}`);
+      const err = new Error(`Gemini API error 429 (rate limited on generation): ${e.message}`);
       err.status = 429;
-      // We can't reliably read the retry-after header from the SDK wrapper error yet,
-      // so we use a safe default 30s.
       err.retryAfterMs = 30_000; 
       throw err;
     }
@@ -107,7 +145,6 @@ SUMMARY: <a 5-8 word unique summary of this specific fact, for dedup purposes>${
 
   // Pull the real, grounded source URL(s) out of groundingMetadata.
   // groundingChunks[].web.uri are the actual pages Gemini's search grounding used.
-  const groundingMetadata = candidate.groundingMetadata;
   const chunks = groundingMetadata?.groundingChunks || [];
   const sourceUrls = chunks
     .map((c) => c.web?.uri)
