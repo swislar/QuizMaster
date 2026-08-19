@@ -72,8 +72,19 @@ Make sure to use the Google Search tool.${topic.listenPreferred
   const searchCandidate = searchData.candidates?.[0];
   if (!searchCandidate) return null;
 
-  const searchContext = searchCandidate.content?.parts?.map((p) => p.text || "").join("\n") || "";
   const groundingMetadata = searchCandidate.groundingMetadata;
+  const chunks = groundingMetadata?.groundingChunks || [];
+  const sourceUrls = chunks
+    .map((c) => c.web?.uri)
+    .filter(Boolean);
+
+  if (sourceUrls.length === 0) {
+    // No grounded source came back — do not trust this fact, caller should retry/skip.
+    return null;
+  }
+
+  const searchContextText = searchCandidate.content?.parts?.map((p) => p.text || "").join("\n") || "";
+  const searchContext = searchContextText + "\n\nAvailable Sources:\n" + sourceUrls.map((u, i) => `[${i + 1}] ${u}`).join("\n");
 
   // We should throttle again since we are making a second call
   await throttle();
@@ -105,7 +116,8 @@ ${searchContext}
 
 Respond in EXACTLY this format, nothing else:
 FACT: <the 1-3 sentence fact>
-SUMMARY: <a 5-8 word unique summary of this specific fact, for dedup purposes>${topic.imageSourcePreferred
+SUMMARY: <a 5-8 word unique summary of this specific fact, for dedup purposes>
+SOURCE: <the exact URL from the Available Sources list that supports this fact>${topic.imageSourcePreferred
       ? "\nIMAGE: <a direct URL starting with http to a public .jpg or .png image of the subject's face/logo, if available in the search results>"
       : ""
     }`;
@@ -116,7 +128,7 @@ SUMMARY: <a 5-8 word unique summary of this specific fact, for dedup purposes>${
       model: mainModel,
       contents: prompt,
       config: {
-        temperature: 0.9,
+        temperature: 0.2,
       }
     });
   } catch (e) {
@@ -134,32 +146,27 @@ SUMMARY: <a 5-8 word unique summary of this specific fact, for dedup purposes>${
   const text = candidate.content?.parts?.map((p) => p.text || "").join("\n") || "";
   const factMatch = text.match(/FACT:\s*([\s\S]*?)\nSUMMARY:/i);
   const summaryMatch = text.match(/SUMMARY:\s*([^\n]+)/i);
+  const sourceMatch = text.match(/SOURCE:\s*([^\n]+)/i);
   const imageMatch = text.match(/IMAGE:\s*([^\n]+)/i);
 
   const fact = factMatch?.[1]?.trim();
   const summary = summaryMatch?.[1]?.trim();
+  let explicitSource = sourceMatch?.[1]?.trim();
   const imageUrl = imageMatch?.[1]?.trim();
   if (!fact) return null;
 
-  // Pull the real, grounded source URL(s) out of groundingMetadata.
-  // groundingChunks[].web.uri are the actual pages Gemini's search grounding used.
-  const chunks = groundingMetadata?.groundingChunks || [];
-  const sourceUrls = chunks
-    .map((c) => c.web?.uri)
-    .filter(Boolean);
-
-  if (sourceUrls.length === 0) {
-    // No grounded source came back — do not trust this fact, caller should retry/skip.
-    return null;
+  // For "listen now" categories (currently just musicals), prefer a link you can actually
+  // press play on over e.g. a Wikipedia page — falls back to the explicitly chosen source.
+  const isListenable = (u) => /youtube\.com|youtu\.be|open\.spotify\.com/i.test(u);
+  
+  if (explicitSource && !sourceUrls.includes(explicitSource)) {
+    // Model hallucinated a source not in our grounding chunks, fall back to the first valid one.
+    explicitSource = sourceUrls[0];
   }
 
-  // For "listen now" categories (currently just musicals), prefer a link you can actually
-  // press play on over e.g. a Wikipedia page — falls back to the first grounded source if
-  // no listenable link was among the search results Gemini grounded on.
-  const isListenable = (u) => /youtube\.com|youtu\.be|open\.spotify\.com/i.test(u);
   const preferredUrl = topic.listenPreferred
-    ? sourceUrls.find(isListenable) || sourceUrls[0]
-    : sourceUrls[0];
+    ? sourceUrls.find(isListenable) || explicitSource || sourceUrls[0]
+    : explicitSource || sourceUrls[0];
 
   return {
     fact,

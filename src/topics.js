@@ -16,8 +16,7 @@ export const TOPICS = [
     id: "quotes-world-leaders",
     label: "Quotes from World Leaders",
     guidance:
-      "A notable, verifiable quote from a world leader or major political figure such as " +
-      "Lee Kuan Yew, Donald Trump, Malala Yousafzai, Barack Obama, or similar — include who " +
+      "A notable, verifiable quote from a world leader or major political figure — include who " +
       "said it and the context.",
   },
   {
@@ -39,9 +38,7 @@ export const TOPICS = [
     label: "Musical Theatre: Name That Tune",
     guidance:
       "Pick ONE well-known, widely popular song from a famous stage musical — prioritize songs " +
-      "that even non-theatre-fans would likely recognize (e.g. 'Defying Gravity' from Wicked, " +
-      "'Memory' from Cats, 'Circle of Life' from The Lion King, songs from Les Misérables, " +
-      "Phantom of the Opera, Hamilton, Mamma Mia!) over obscure deep cuts. State the song title " +
+      "that even non-theatre-fans would likely recognize over obscure deep cuts. State the song title " +
       "and which musical it's from as the core fact, phrased like a reveal (e.g. \"'Defying " +
       "Gravity' is from Wicked, first performed on Broadway in 2003\"). End the fact by " +
       "inviting the reader to go listen to it now so they can recognize it if it's played in a " +
@@ -62,8 +59,7 @@ export const TOPICS = [
     label: "Picture Round: Celebrities",
     guidance:
       "A distinctive, well-known identifying fact about a globally recognizable celebrity " +
-      "(e.g. Simon Cowell, Kim Kardashian) — career milestone, defining trait, or well-known " +
-      "biographical fact that helps someone identify or recall them.",
+      "— career milestone, defining trait, or well-known biographical fact that helps someone identify or recall them.",
     imageSourcePreferred: true,
   },
   {
