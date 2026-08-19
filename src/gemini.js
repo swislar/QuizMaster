@@ -36,18 +36,77 @@ export async function generateGroundedFact({ topic, avoidSummaries }) {
   const searchModel = "gemini-2.5-flash";
   const mainModel = process.env.GEMINI_MODEL || "gemini-3.7-flash";
 
-  // Step 1: Use gemini-2.5-flash for search and grounding
-  const searchPrompt = `Search for obscure and interesting trivia facts about the following category for a pub quiz.
-Category: "${topic.label}"
-What it tests: ${topic.guidance}
+  // Step 1: Main model generates the fact
+  const avoidBlock =
+    avoidSummaries && avoidSummaries.length > 0
+      ? `Avoid repeating these facts already sent recently:\n- ${avoidSummaries.join("\n- ")}\n`
+      : "";
 
-Please provide a detailed summary of facts you find, including names, dates, and numbers.
-Make sure to use the Google Search tool.${topic.listenPreferred
-      ? "\nSpecifically look for the song's official YouTube upload or Spotify listing so a listenable link is available among your sources."
-      : topic.imageSourcePreferred
-        ? "\nSpecifically look for a source that contains a clear image of the subject, since this is for a picture round."
-        : ""
+  const prompt = `You are writing ONE trivia study fact for a pub quiz study group preparing for
+a Singapore-based pub quiz/trivia night (Quizmaster SG style).
+
+Round category: "${topic.label}"
+What this round tests: ${topic.guidance}
+
+${avoidBlock}
+Requirements:
+- Focus on LESS COMMONLY KNOWN facts and MORE OBSCURE subjects (e.g., avoid the most obvious mega-brands like Nike or celebrities like Taylor Swift). Dig deeper for interesting trivia that people might not immediately know.
+- Write 1-3 sentences. Specific, memorable, and quiz-relevant (names, dates, numbers where relevant). Avoid vague trivia ("many people believe...").
+- Keep it concise enough to read in a Telegram message.
+- Do NOT include any URL in your answer text — sources are attached separately.
+
+Respond in EXACTLY this format, nothing else:
+FACT: <the 1-3 sentence fact>
+SUMMARY: <a 5-8 word unique summary of this specific fact, for dedup purposes>${topic.imageSourcePreferred
+      ? "\nIMAGE: <a direct URL starting with http to a public .jpg or .png image of the subject's face/logo, if you know of one>"
+      : ""
     }`;
+
+  let data;
+  try {
+    data = await ai.models.generateContent({
+      model: mainModel,
+      contents: prompt,
+      config: {
+        temperature: 0.9,
+      }
+    });
+  } catch (e) {
+    if (e.status === 429 || (e.message && e.message.includes("429"))) {
+      const err = new Error(`Gemini API error 429 (rate limited on generation): ${e.message}`);
+      err.status = 429;
+      err.retryAfterMs = 30_000;
+      throw err;
+    }
+    throw e;
+  }
+  const candidate = data.candidates?.[0];
+  if (!candidate) return null;
+
+  const text = candidate.content?.parts?.map((p) => p.text || "").join("\n") || "";
+  const factMatch = text.match(/FACT:\s*([\s\S]*?)\nSUMMARY:/i);
+  const summaryMatch = text.match(/SUMMARY:\s*([^\n]+)/i);
+  const imageMatch = text.match(/IMAGE:\s*([^\n]+)/i);
+
+  const fact = factMatch?.[1]?.trim();
+  const summary = summaryMatch?.[1]?.trim();
+  const imageUrl = imageMatch?.[1]?.trim();
+  if (!fact) return null;
+
+  // We should throttle again since we are making a second call
+  await throttle();
+
+  // Step 2: Use gemini-2.5-flash for search and grounding
+  const searchPrompt = `Please find a reliable web source that supports the following trivia fact:
+"${fact}"
+
+Category: "${topic.label}"
+
+Use the Google Search tool to find a reliable source verifying this fact.${topic.listenPreferred
+      ? "\nSpecifically look for the song's official YouTube upload or Spotify listing so a listenable link is available among your sources."
+      : ""
+    }
+Return a brief verification of the fact based on the search results.`;
 
   let searchData;
   try {
@@ -56,7 +115,7 @@ Make sure to use the Google Search tool.${topic.listenPreferred
       contents: searchPrompt,
       config: {
         tools: [{ googleSearch: {} }],
-        temperature: 0.7,
+        temperature: 0.2,
       }
     });
   } catch (e) {
@@ -83,90 +142,12 @@ Make sure to use the Google Search tool.${topic.listenPreferred
     return null;
   }
 
-  const searchContextText = searchCandidate.content?.parts?.map((p) => p.text || "").join("\n") || "";
-  const searchContext = searchContextText + "\n\nAvailable Sources:\n" + sourceUrls.map((u, i) => `[${i + 1}] ${u}`).join("\n");
-
-  // We should throttle again since we are making a second call
-  await throttle();
-
-  // Step 2: Main model generates the fact
-  const avoidBlock =
-    avoidSummaries && avoidSummaries.length > 0
-      ? `Avoid repeating these facts already sent recently:\n- ${avoidSummaries.join("\n- ")}\n`
-      : "";
-
-  const prompt = `You are writing ONE trivia study fact for a pub quiz study group preparing for
-a Singapore-based pub quiz/trivia night (Quizmaster SG style).
-
-Round category: "${topic.label}"
-What this round tests: ${topic.guidance}
-
-${avoidBlock}
-Requirements:
-- Focus on LESS COMMONLY KNOWN facts and MORE OBSCURE subjects (e.g., avoid the most obvious mega-brands like Nike or celebrities like Taylor Swift). Dig deeper for interesting trivia that people might not immediately know.
-- Write 1-3 sentences. Specific, memorable, and quiz-relevant (names, dates, numbers where
-  relevant). Avoid vague trivia ("many people believe...").
-- Keep it concise enough to read in a Telegram message.
-- Do NOT include any URL in your answer text — sources are attached separately.
-
-Use the following search results to find a verified fact to use. ONLY use information supported by these search results:
-<search_results>
-${searchContext}
-</search_results>
-
-Respond in EXACTLY this format, nothing else:
-FACT: <the 1-3 sentence fact>
-SUMMARY: <a 5-8 word unique summary of this specific fact, for dedup purposes>
-SOURCE: <the exact URL from the Available Sources list that supports this fact>${topic.imageSourcePreferred
-      ? "\nIMAGE: <a direct URL starting with http to a public .jpg or .png image of the subject's face/logo, if available in the search results>"
-      : ""
-    }`;
-
-  let data;
-  try {
-    data = await ai.models.generateContent({
-      model: mainModel,
-      contents: prompt,
-      config: {
-        temperature: 0.2,
-      }
-    });
-  } catch (e) {
-    if (e.status === 429 || (e.message && e.message.includes("429"))) {
-      const err = new Error(`Gemini API error 429 (rate limited on generation): ${e.message}`);
-      err.status = 429;
-      err.retryAfterMs = 30_000;
-      throw err;
-    }
-    throw e;
-  }
-  const candidate = data.candidates?.[0];
-  if (!candidate) return null;
-
-  const text = candidate.content?.parts?.map((p) => p.text || "").join("\n") || "";
-  const factMatch = text.match(/FACT:\s*([\s\S]*?)\nSUMMARY:/i);
-  const summaryMatch = text.match(/SUMMARY:\s*([^\n]+)/i);
-  const sourceMatch = text.match(/SOURCE:\s*([^\n]+)/i);
-  const imageMatch = text.match(/IMAGE:\s*([^\n]+)/i);
-
-  const fact = factMatch?.[1]?.trim();
-  const summary = summaryMatch?.[1]?.trim();
-  let explicitSource = sourceMatch?.[1]?.trim();
-  const imageUrl = imageMatch?.[1]?.trim();
-  if (!fact) return null;
-
-  // For "listen now" categories (currently just musicals), prefer a link you can actually
-  // press play on over e.g. a Wikipedia page — falls back to the explicitly chosen source.
+  // For "listen now" categories, prefer a link you can actually press play on
   const isListenable = (u) => /youtube\.com|youtu\.be|open\.spotify\.com/i.test(u);
   
-  if (explicitSource && !sourceUrls.includes(explicitSource)) {
-    // Model hallucinated a source not in our grounding chunks, fall back to the first valid one.
-    explicitSource = sourceUrls[0];
-  }
-
   const preferredUrl = topic.listenPreferred
-    ? sourceUrls.find(isListenable) || explicitSource || sourceUrls[0]
-    : explicitSource || sourceUrls[0];
+    ? sourceUrls.find(isListenable) || sourceUrls[0]
+    : sourceUrls[0];
 
   return {
     fact,
