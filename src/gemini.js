@@ -70,7 +70,7 @@ Rules:
 `;
 
 export async function verifyFact({ claim, searchResultsText }) {
-  const verifyModel = "gemini-2.5-flash";
+  const verifyModel = process.env.GEMINI_VERIFY_MODEL || process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
   await throttle(verifyModel);
 
   const contents = `${GROUNDING_VERIFICATION_PROMPT}
@@ -114,7 +114,13 @@ Respond ONLY with valid JSON.`;
  * Returns null if the fact is UNVERIFIED or CONTRADICTED (caller should retry or fall back).
  */
 export async function generateGroundedFact({ topic, avoidSummaries }) {
-  const searchModel = "gemini-2.5-flash";
+  const searchModels = [
+    process.env.GEMINI_SEARCH_MODEL,
+    process.env.GEMINI_SEARCH_MODEL_NEXT,
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+  ].filter(Boolean);
+  const uniqueSearchModels = [...new Set(searchModels)];
   const mainModel = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
 
   // Step 1: Constrained fact generation
@@ -176,9 +182,7 @@ SUMMARY: <a 5-8 word unique summary of this specific fact, for dedup purposes>${
   const imageUrl = imageMatch?.[1]?.trim();
   if (!draftFact) return null;
 
-  // Step 2: Targeted retrieval via Google Search grounding
-  await throttle(searchModel);
-
+  // Step 2: Targeted retrieval via Google Search grounding (with fallback search models)
   const searchPrompt = `Please search and verify the following specific trivia claim:
 "${draftFact}"
 
@@ -190,28 +194,45 @@ Use the Google Search tool to find reliable sources that explicitly mention the 
     }
 Return a detailed verification summary of the facts found in the search results.`;
 
-  let searchData;
-  try {
-    searchData = await ai.models.generateContent({
-      model: searchModel,
-      contents: searchPrompt,
-      config: {
-        tools: [{ googleSearch: {} }],
-        temperature: 0.1,
-      },
-    });
-  } catch (e) {
-    if (e.status === 429 || (e.message && e.message.includes("429"))) {
-      const err = new Error(`Gemini API error 429 (rate limited on search): ${e.message}`);
+  let searchCandidate = null;
+  let lastSearchError = null;
+
+  for (const modelToTry of uniqueSearchModels) {
+    try {
+      await throttle(modelToTry);
+      const searchData = await ai.models.generateContent({
+        model: modelToTry,
+        contents: searchPrompt,
+        config: {
+          tools: [{ googleSearch: {} }],
+          temperature: 0.1,
+        },
+      });
+
+      const cand = searchData.candidates?.[0];
+      if (cand) {
+        searchCandidate = cand;
+        break;
+      }
+    } catch (e) {
+      lastSearchError = e;
+      console.warn(`[Search] Model "${modelToTry}" failed search grounding (${e.message}).`);
+      const isLast = modelToTry === uniqueSearchModels[uniqueSearchModels.length - 1];
+      if (!isLast) {
+        console.log(`[Search] Trying next fallback search model...`);
+      }
+    }
+  }
+
+  if (!searchCandidate) {
+    if (lastSearchError && (lastSearchError.status === 429 || (lastSearchError.message && lastSearchError.message.includes("429")))) {
+      const err = new Error(`Gemini API error 429 across search models: ${lastSearchError.message}`);
       err.status = 429;
       err.retryAfterMs = 3_000;
       throw err;
     }
-    throw e;
+    return null;
   }
-
-  const searchCandidate = searchData.candidates?.[0];
-  if (!searchCandidate) return null;
 
   const searchSummaryText = searchCandidate.content?.parts?.map((p) => p.text || "").join("\n") || "";
   const groundingMetadata = searchCandidate.groundingMetadata;

@@ -40,9 +40,14 @@ export async function pickAndSendFact(chatIds, allowedTopicIds = null, targetMes
       console.warn(`[Pipeline] Verification failed for topic "${topic.label}", retrying next candidate...`);
     } catch (err) {
       console.error(`[Pipeline] Error generating fact for "${topic.label}":`, err.message);
-      if (err.status === 429 && err.retryAfterMs) {
-        console.log(`Rate limited — waiting ${Math.ceil(err.retryAfterMs / 1000)}s before retrying...`);
-        await sleep(err.retryAfterMs);
+      if (
+        err.status === 429 ||
+        err.message?.includes("429") ||
+        err.message?.includes("RESOURCE_EXHAUSTED") ||
+        err.message?.includes("Quota exceeded")
+      ) {
+        // Daily quota or rate limit reached on models. Re-throw immediately so caller surfaces the 'try again tomorrow' message.
+        throw err;
       }
     }
   }

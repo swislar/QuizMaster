@@ -115,10 +115,16 @@ async function handleGetFact(chatId, allowedTopicIds = null) {
     await pickAndSendFact(chatId, allowedTopicIds, placeholderMessageId);
   } catch (err) {
     console.error("Error handling command:", err);
-    const errorText =
-      err.message?.includes("429") || err.message?.includes("attempts across topics")
-        ? "⚠️ Gemini's rate limit is being hit right now — I backed off but still couldn't get a verified fact. Try again in a minute or two."
-        : "⚠️ Couldn't generate a verified fact just now — try again in a bit.";
+    const isQuotaOrRateLimit =
+      err.status === 429 ||
+      err.message?.includes("429") ||
+      err.message?.includes("RESOURCE_EXHAUSTED") ||
+      err.message?.includes("Quota exceeded") ||
+      err.message?.includes("quota");
+
+    const errorText = isQuotaOrRateLimit
+      ? "⏳ <b>Daily limit reached</b> — the AI model and search quota limits have been reached for today. Please try again tomorrow!"
+      : "⚠️ Couldn't generate a verified fact just now — please try again in a moment.";
 
     if (placeholderMessageId) {
       try {
@@ -129,6 +135,7 @@ async function handleGetFact(chatId, allowedTopicIds = null) {
             chat_id: chatId,
             message_id: placeholderMessageId,
             text: errorText,
+            parse_mode: "HTML",
           }),
         });
         const editData = await editRes.json();
@@ -144,6 +151,7 @@ async function handleGetFact(chatId, allowedTopicIds = null) {
       body: JSON.stringify({
         chat_id: chatId,
         text: errorText,
+        parse_mode: "HTML",
       }),
     });
   } finally {
