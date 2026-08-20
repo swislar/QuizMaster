@@ -29,8 +29,8 @@ async function setBotCommands() {
   const url = `${API}/setMyCommands`;
   const commands = [
     { command: "fact", description: "Get a random trivia fact right now" },
-    { command: "quote", description: "Get a quote from a famous person or world leader" },
-    { command: "firsts", description: "Get a notable 'first' in history" },
+    { command: "quote", description: "Get a famous quote or movie line" },
+    { command: "firsts", description: "Get a notable famous 'first' in history" },
     { command: "music", description: "Get a music or musical theatre fact" },
     { command: "picture", description: "Get a fact about a brand or celebrity" },
     { command: "knowledge", description: "Get general knowledge or Singapore facts" }
@@ -133,8 +133,8 @@ async function pollLoop() {
       // per-chat spam/quota guard. Logged here so you have an audit trail of who's using it.
       const commandMap = {
         "/fact": null,
-        "/quote": ["quotes-famous", "quotes-world-leaders"],
-        "/firsts": ["firsts"],
+        "/quote": ["quotes"],
+        "/firsts": ["famous-firsts"],
         "/music": ["music-decade", "musicals"],
         "/picture": ["picture-round-brands", "picture-round-celebrities"],
         "/knowledge": ["singapore", "general-knowledge"]

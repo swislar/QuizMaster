@@ -1,4 +1,4 @@
-import { pickTopic } from "./topics.js";
+import { pickTopic, getFallbackFact, TOPICS } from "./topics.js";
 import { generateGroundedFact } from "./gemini.js";
 import { formatMessage, sendTelegramMessage } from "./telegram.js";
 import { loadHistory, saveHistoryEntry, recentTopicIds, recentFactSummaries } from "./history.js";
@@ -10,9 +10,8 @@ function sleep(ms) {
 }
 
 /**
- * Picks a topic, generates a grounded fact, sends it to the given chat, and records it
- * in history. Throws if it can't produce a grounded fact after MAX_ATTEMPTS — callers
- * decide how to surface that (exit code for the daily script, a chat reply for /getfact).
+ * Picks a topic, generates a verified grounded fact, sends it to the given chat, and records it
+ * in history. Falls back to a curated fact bank if dynamic generation fails verification.
  */
 export async function pickAndSendFact(chatIds, allowedTopicIds = null) {
   const ids = Array.isArray(chatIds) ? chatIds : [chatIds];
@@ -27,33 +26,43 @@ export async function pickAndSendFact(chatIds, allowedTopicIds = null) {
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const topic = pickTopic([...avoidTopicIds, ...attempted], allowedTopicIds);
     attempted.add(topic.id);
-    console.log(`Attempt ${attempt + 1}: trying topic "${topic.label}"...`);
+    console.log(`[Pipeline] Attempt ${attempt + 1}/${MAX_ATTEMPTS}: generating & verifying for "${topic.label}"...`);
 
     try {
       const fact = await generateGroundedFact({ topic, avoidSummaries });
       if (fact) {
         result = fact;
         usedTopic = topic;
+        console.log(`[Pipeline] Successfully verified fact for category "${topic.label}".`);
         break;
       }
-      console.warn(`No grounded source returned for "${topic.label}", retrying with a new topic.`);
+      console.warn(`[Pipeline] Verification failed for topic "${topic.label}", retrying next candidate...`);
     } catch (err) {
-      console.error(`Error generating fact for "${topic.label}":`, err.message);
+      console.error(`[Pipeline] Error generating fact for "${topic.label}":`, err.message);
       if (err.status === 429 && err.retryAfterMs) {
-        // Don't hammer straight back in — this is what was causing the request burst.
-        // The module-level throttle in gemini.js already spaces out the *next* call,
-        // but a 429 means we should wait longer than the default spacing specifically.
         console.log(`Rate limited — waiting ${Math.ceil(err.retryAfterMs / 1000)}s before retrying...`);
         await sleep(err.retryAfterMs);
       }
     }
   }
 
+  // If dynamic generation & verification failed across all attempts, use curated fallback
   if (!result) {
-    throw new Error(
-      `Failed to produce a grounded fact after ${MAX_ATTEMPTS} attempts across topics: ` +
-        `${[...attempted].join(", ")}. Not sending anything to avoid posting an unverified fact.`
-    );
+    console.warn(`[Pipeline] All ${MAX_ATTEMPTS} dynamic attempts failed verification. Falling back to curated fact bank.`);
+    const fallbackTopic = (allowedTopicIds && allowedTopicIds.length > 0)
+      ? TOPICS.find((t) => allowedTopicIds.includes(t.id)) || TOPICS[0]
+      : pickTopic(avoidTopicIds);
+
+    const fallback = getFallbackFact(fallbackTopic.id, avoidSummaries);
+    usedTopic = fallbackTopic;
+    result = {
+      fact: fallback.fact,
+      summary: fallback.summary,
+      sourceUrl: fallback.sourceUrl,
+      imageUrl: fallback.imageUrl || null,
+      verified: true,
+      isFallback: true,
+    };
   }
 
   const message = formatMessage({

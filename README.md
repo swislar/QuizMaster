@@ -22,27 +22,16 @@ below if you want zero tolerance for errors.
 
 ## Architecture
 
-There are **two ways to run this**, and which one you pick depends on whether you want the
-`/getfact` command:
+There is **one main way to run this** if you want both scheduled facts and the `/getfact` command:
 
-**Option A — scheduled only, no `/getfact` (simplest, free, nothing to host)**
-```
-GitHub Actions (cron, 01:00 UTC = 09:00 SGT)
-        │
-        ▼
-  src/sendDailyFact.js   (single-shot script, exits when done)
-```
-
-**Option B — scheduled + `/getfact` on demand (requires an always-on host)**
+**Option A — scheduled + `/getfact` on demand (requires an always-on host)**
 ```
 Always-on process: src/bot.js
         │
         ├── long-polls Telegram getUpdates() → sees "/getfact" → sends a fact immediately
         └── node-cron, 09:00 Asia/Singapore → sends the daily fact automatically
 ```
-`/getfact` only works with Option B, because responding to a message requires a process that's
-listening continuously. GitHub Actions wakes up once a day and exits — it can't hear commands.
-**Run only one of these two options**, not both, or the group gets the daily fact twice.
+`/getfact` requires a process that's listening continuously.
 
 Both options call into the same shared logic:
 ```

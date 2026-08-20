@@ -3,9 +3,8 @@
   "version": "1.0.0",
   "description": "Daily Telegram trivia fact bot for pub quiz study group, grounded via Gemini Search Grounding",
   "type": "module",
-  "main": "src/sendDailyFact.js",
+  "main": "src/bot.js",
   "scripts": {
-    "send": "node src/sendDailyFact.js",
     "bot": "node src/bot.js"
   },
   "dependencies": {
