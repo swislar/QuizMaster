@@ -1,6 +1,6 @@
 import { pickTopic, getFallbackFact, TOPICS } from "./topics.js";
 import { generateGroundedFact } from "./gemini.js";
-import { formatMessage, sendTelegramMessage } from "./telegram.js";
+import { formatMessage, sendTelegramMessage, editTelegramMessage } from "./telegram.js";
 import { loadHistory, saveHistoryEntry, recentTopicIds, recentFactSummaries } from "./history.js";
 
 const MAX_ATTEMPTS = 4; // across possibly different topics, to avoid an ungrounded fact
@@ -10,10 +10,11 @@ function sleep(ms) {
 }
 
 /**
- * Picks a topic, generates a verified grounded fact, sends it to the given chat, and records it
- * in history. Falls back to a curated fact bank if dynamic generation fails verification.
+ * Picks a topic, generates a verified grounded fact, sends/edits it for the given chat(s),
+ * and records it in history.
+ * targetMessageIds can be a single message_id (if chatIds is a single chat) or a map of { [chatId]: message_id }.
  */
-export async function pickAndSendFact(chatIds, allowedTopicIds = null) {
+export async function pickAndSendFact(chatIds, allowedTopicIds = null, targetMessageIds = null) {
   const ids = Array.isArray(chatIds) ? chatIds : [chatIds];
   const history = await loadHistory();
   const avoidTopicIds = recentTopicIds(history, 4);
@@ -75,6 +76,21 @@ export async function pickAndSendFact(chatIds, allowedTopicIds = null) {
   });
 
   for (const id of ids) {
+    const targetMsgId =
+      typeof targetMessageIds === "object" && targetMessageIds !== null
+        ? targetMessageIds[id]
+        : targetMessageIds;
+
+    if (targetMsgId) {
+      console.log(`Editing message ${targetMsgId} in chat ${id}:\n` + message);
+      try {
+        await editTelegramMessage(id, targetMsgId, message);
+        continue;
+      } catch (err) {
+        console.warn(`Failed to edit message ${targetMsgId} in chat ${id}, falling back to sendMessage:`, err.message);
+      }
+    }
+
     console.log(`Sending message to ${id}:\n` + message);
     try {
       await sendTelegramMessage(id, message);

@@ -33,7 +33,31 @@ export async function sendTelegramMessage(chatId, text) {
 
   const data = await res.json();
   if (!data.ok) {
-    throw new Error(`Telegram API error: ${JSON.stringify(data)}`);
+    throw new Error(`Telegram API error (sendMessage): ${JSON.stringify(data)}`);
   }
   return data;
 }
+
+export async function editTelegramMessage(chatId, messageId, text) {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const url = `https://api.telegram.org/bot${token}/editMessageText`;
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      message_id: messageId,
+      text,
+      parse_mode: "HTML",
+      disable_web_page_preview: false,
+    }),
+  });
+
+  const data = await res.json();
+  if (!data.ok) {
+    throw new Error(`Telegram API error (editMessageText): ${JSON.stringify(data)}`);
+  }
+  return data;
+}
+

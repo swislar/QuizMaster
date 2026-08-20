@@ -92,18 +92,58 @@ async function handleGetFact(chatId, allowedTopicIds = null) {
   // longer than that, so keep refreshing it while we wait rather than let it go stale.
   const typingInterval = setInterval(showTyping, 4000);
 
+  let placeholderMessageId = null;
   try {
-    await pickAndSendFact(chatId, allowedTopicIds);
+    const res = await fetch(`${API}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: "🔍 <i>Finding and verifying a trivia fact...</i>",
+        parse_mode: "HTML",
+      }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      placeholderMessageId = data.result.message_id;
+    }
+  } catch (err) {
+    console.warn("Failed to send initial placeholder message:", err.message);
+  }
+
+  try {
+    await pickAndSendFact(chatId, allowedTopicIds, placeholderMessageId);
   } catch (err) {
     console.error("Error handling command:", err);
+    const errorText =
+      err.message?.includes("429") || err.message?.includes("attempts across topics")
+        ? "⚠️ Gemini's rate limit is being hit right now — I backed off but still couldn't get a verified fact. Try again in a minute or two."
+        : "⚠️ Couldn't generate a verified fact just now — try again in a bit.";
+
+    if (placeholderMessageId) {
+      try {
+        const editRes = await fetch(`${API}/editMessageText`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: chatId,
+            message_id: placeholderMessageId,
+            text: errorText,
+          }),
+        });
+        const editData = await editRes.json();
+        if (editData.ok) return;
+      } catch {
+        // Fall back to sending a new message below
+      }
+    }
+
     await fetch(`${API}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         chat_id: chatId,
-        text: err.message?.includes("429") || err.message?.includes("attempts across topics")
-          ? "⚠️ Gemini's rate limit is being hit right now — I backed off but still couldn't get a verified fact. Try again in a minute or two."
-          : "⚠️ Couldn't generate a verified fact just now — try again in a bit.",
+        text: errorText,
       }),
     });
   } finally {
