@@ -100,7 +100,7 @@ Respond ONLY with valid JSON.`;
     if (err.status === 429 || (err.message && err.message.includes("429"))) {
       const e = new Error(`Gemini API error 429 (rate limited on verification): ${err.message}`);
       e.status = 429;
-      e.retryAfterMs = 30_000;
+      e.retryAfterMs = 3_000;
       throw e;
     }
     console.warn("Error running entailment verification pass:", err.message);
@@ -158,7 +158,7 @@ SUMMARY: <a 5-8 word unique summary of this specific fact, for dedup purposes>${
     if (e.status === 429 || (e.message && e.message.includes("429"))) {
       const err = new Error(`Gemini API error 429 (rate limited on generation): ${e.message}`);
       err.status = 429;
-      err.retryAfterMs = 30_000;
+      err.retryAfterMs = 3_000;
       throw err;
     }
     throw e;
@@ -204,7 +204,7 @@ Return a detailed verification summary of the facts found in the search results.
     if (e.status === 429 || (e.message && e.message.includes("429"))) {
       const err = new Error(`Gemini API error 429 (rate limited on search): ${e.message}`);
       err.status = 429;
-      err.retryAfterMs = 30_000;
+      err.retryAfterMs = 3_000;
       throw err;
     }
     throw e;
