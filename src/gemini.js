@@ -2,25 +2,25 @@ import { GoogleGenAI } from "@google/genai";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-// Global throttle across ALL callers (cron, /getfact from the group, /getfact from a DM,
-// and retries within a single call) so we never burst multiple requests at once — that's
-// what was tripping the per-minute rate limit even though daily quota was fine. Free-tier
-// Gemini Flash is commonly ~10 requests/minute; 7s spacing keeps us comfortably under that
-// with margin. Adjust if your project's actual RPM (check aistudio.google.com) differs.
-const MIN_INTERVAL_MS = 7000;
-let lastCallAt = 0;
+// Per-model throttle tracking. Google AI Studio enforces 15 RPM (4.0s minimum interval)
+// separately for each distinct model (e.g. text generation on gemini-3.5-flash-lite vs search/verification on gemini-2.5-flash).
+// Tracking timestamps per-model achieves the theoretical maximum speed by allowing parallel model buckets,
+// while strictly guaranteeing neither model ever exceeds 15 RPM.
+const MODEL_INTERVAL_MS = 4000;
+const lastCallAtByModel = new Map();
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function throttle() {
-  const waitMs = MIN_INTERVAL_MS - (Date.now() - lastCallAt);
+async function throttle(modelName) {
+  const lastCallAt = lastCallAtByModel.get(modelName) || 0;
+  const waitMs = MODEL_INTERVAL_MS - (Date.now() - lastCallAt);
   if (waitMs > 0) {
-    console.log(`Throttling: waiting ${Math.ceil(waitMs / 1000)}s before next Gemini call...`);
+    console.log(`[Throttling] Model "${modelName}" waiting ${Math.ceil(waitMs / 1000)}s for 15 RPM limit...`);
     await sleep(waitMs);
   }
-  lastCallAt = Date.now();
+  lastCallAtByModel.set(modelName, Date.now());
 }
 
 /**
@@ -70,8 +70,8 @@ Rules:
 `;
 
 export async function verifyFact({ claim, searchResultsText }) {
-  await throttle();
   const verifyModel = "gemini-2.5-flash";
+  await throttle(verifyModel);
 
   const contents = `${GROUNDING_VERIFICATION_PROMPT}
 
@@ -114,12 +114,12 @@ Respond ONLY with valid JSON.`;
  * Returns null if the fact is UNVERIFIED or CONTRADICTED (caller should retry or fall back).
  */
 export async function generateGroundedFact({ topic, avoidSummaries }) {
-  await throttle();
-
   const searchModel = "gemini-2.5-flash";
-  const mainModel = process.env.GEMINI_MODEL || "gemini-3.7-flash";
+  const mainModel = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
 
   // Step 1: Constrained fact generation
+  await throttle(mainModel);
+
   const avoidBlock =
     avoidSummaries && avoidSummaries.length > 0
       ? `Avoid repeating these facts already sent recently:\n- ${avoidSummaries.join("\n- ")}\n`
@@ -177,7 +177,7 @@ SUMMARY: <a 5-8 word unique summary of this specific fact, for dedup purposes>${
   if (!draftFact) return null;
 
   // Step 2: Targeted retrieval via Google Search grounding
-  await throttle();
+  await throttle(searchModel);
 
   const searchPrompt = `Please search and verify the following specific trivia claim:
 "${draftFact}"
